@@ -898,8 +898,7 @@ if __name__ == "__main__":
     )
     group.add_argument(
         "--gcc-version",
-        default="11.3.0", # https://ftp.gnu.org/gnu/gcc
-        # default="13.1.0",
+        default="13.1.0", # https://ftp.gnu.org/gnu/gcc
         help="Gcc version to build.",
     )
     group.add_argument(
