@@ -893,42 +893,44 @@ if __name__ == "__main__":
     group = parser.add_argument_group("dependencies")
     group.add_argument(
         "--binutils-version",
-        default="2.40",
+        default="2.40", # https://ftp.gnu.org/gnu/binutils
         help="Binutils version to build.",
     )
     group.add_argument(
         "--gcc-version",
-        default="11.3.0",
+        default="11.3.0", # https://ftp.gnu.org/gnu/gcc
+        # default="13.1.0",
         help="Gcc version to build.",
     )
     group.add_argument(
         "--gmp-version",
-        default="6.2.1",
+        default="6.2.1", # https://ftp.gnu.org/gnu/gmp
         help="Gmp version to build.",
     )
     group.add_argument(
         "--mpc-version",
-        default="1.3.1",
+        default="1.3.1", # https://ftp.gnu.org/gnu/mpc
         help="Mpc version to build.",
     )
     group.add_argument(
         "--mpfr-version",
-        default="4.2.0",
+        default="4.2.0", # https://ftp.gnu.org/gnu/mpfr
         help="Mpfr version to build.",
     )
     group.add_argument(
         "--isl-version",
-        default="0.24",
+        default="0.24", # https://libisl.sourceforge.io
+        # default="0.26",
         help="Isl version to build.",
     )
     group.add_argument(
         "--linux-version",
-        default="6.3.3",
+        default="6.3.4", # https://www.kernel.org
         help="Linux version to build.",
     )
     group.add_argument(
         "--musl-version",
-        default="1.2.4",
+        default="1.2.4", # https://musl.libc.org
         help="Musl version to build.",
     )
     args = Args(parser.parse_args())
