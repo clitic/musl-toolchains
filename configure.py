@@ -1,16 +1,21 @@
 import argparse
+import io
 import os
 import sys
 import shutil
 import platform
+import requests
+import zipfile
 from ninja import ninja_syntax
 from pathlib import Path
 from typing import Optional, List
 
 
+MUSL_CROSS_MAKE_COMMIT = "fe915821b652a7fa37b34a596f47d8e20bc72338"
+
+
 class Args:
-    build_dir = (Path,)
-    prefix = (Path,)
+    prefix = (str,)
 
     host = (Optional[str],)
     target = (str,)
@@ -40,7 +45,6 @@ class Args:
     _make = (str,)
 
     def __init__(self, args: argparse.Namespace) -> None:
-        self.build_dir = args.build_dir
         self.prefix = args.prefix
 
         self.host = args.host
@@ -137,18 +141,6 @@ class Args:
     def is_cross(self) -> bool:
         return self.host is None
 
-    def is_cross_native(self) -> bool:
-        if self.host:
-            return self.host == self.target
-
-        return False
-
-    def is_canadian_cross(self) -> bool:
-        if self.host:
-            return self.host != self.target
-
-        return False
-
     def dependencies_summary(self) -> None:
         print("\nDependencies:")
         print(f"  binutils {self.binutils_version}")
@@ -240,7 +232,7 @@ class Args:
             writer.variable("cc", self.cc)
             writer.variable("cxx", self.cxx)
 
-            if self.is_canadian_cross():
+            if not self.is_cross():
                 writer.variable("cc_build", self.cc_build)
                 writer.variable("cxx_build", self.cxx_build)
 
@@ -271,29 +263,29 @@ class Args:
             writer.variable("musl_site", "https://www.musl-libc.org")
             writer.newline()
             writer.variable("download_command", f"curl -L -o")
-            # MAKEINFO=false
             writer.variable(
                 "make_command",
                 f"{self._make} -j {cpu_count} MULTILIB_OSDIRNAMES= INFO_DEPS= infodir= ac_cv_prog_lex_root=lex.yy",
             )
             writer.newline()
-            writer.comment("edit below carefully")
+            writer.comment("edit below this line carefully")
             writer.newline()
             env_vars = 'CC="$cc" CXX="$cxx" CFLAGS="$cc_flags" CXXFLAGS="$cxx_flags" LDFLAGS="$ld_flags"'
 
-            if self.is_canadian_cross():
+            if not self.is_cross():
                 env_vars += ' CC_FOR_BUILD="$cc_build" CXX_FOR_BUILD="$cxx_build"'
 
             writer.variable("env_vars", env_vars)
             writer.newline()
             writer.variable("root_dir", Path(".").absolute())
             writer.variable("build_dir", "build")
-            writer.variable("build_sysroot_dir", "$root_dir/$build_dir/sysroot")
+            writer.variable("build_sysroot_dir",
+                            "$root_dir/$build_dir/sysroot")
             writer.variable("build_targets_dir", "$build_dir/targets")
             writer.variable("download_dir", "downloads")
-            writer.variable("install_dir", "$root_dir/toolchain")
+            writer.variable("install_dir", self.prefix)
             writer.newline()
-            writer.comment("step 1 - download and extract archives")
+            writer.comment("step 1 - download, extract and patch archives")
             writer.newline()
 
             download_targets = ["binutils", "gcc", "gmp"]
@@ -317,7 +309,8 @@ class Args:
             writer.newline()
 
             for name in download_targets:
-                writer.variable(f"{name}_dir", f"$build_dir/{name}-${name}_version")
+                writer.variable(
+                    f"{name}_dir", f"$build_dir/{name}-${name}_version")
 
             writer.newline()
             writer.rule(
@@ -328,8 +321,8 @@ class Args:
             writer.newline()
             writer.rule(
                 "extract-tar",
-                "rm -rf $extracted_dir && tar -C $build_dir -x -$compression -f $in && touch $out",
-                description="Extracting $in",
+                "rm -rf $extracted_dir && tar -C $build_dir -x -$compression -f $in && cd $extracted_dir && $patch_command && touch ../$out",
+                description='Extracting $in and patching it with "$patch_command"',
             )
             writer.newline()
             writer.build(
@@ -392,24 +385,51 @@ class Args:
                 "$musl_tarball",
                 "download-tarball",
                 pool="console",
-                variables={"url": "$musl_site/releases/musl-$musl_version.tar.gz"},
+                variables={
+                    "url": "$musl_site/releases/musl-$musl_version.tar.gz"},
             )
+            writer.newline()
 
-            for name in download_targets:
+            name_version_tuples = [
+                ("binutils", self.binutils_version),
+                ("gcc", self.gcc_version),
+                ("gmp", self.gmp_version),
+            ]
+
+            if self.gcc_with_isl:
+                name_version_tuples.append(("isl", self.isl_version))
+
+            name_version_tuples.extend([
+                ("linux", self.linux_version),
+                ("mpc", self.mpc_version),
+                ("mpfr", self.mpfr_version),
+                ("musl", self.musl_version),
+            ])
+
+            for (name, version) in name_version_tuples:
                 compression = "J"
+                patch_command = "true"
 
                 if name in ["mpc", "musl"]:
                     compression = "x"
 
-                writer.newline()
+                patch = Patch(name, version)
+
+                if patch.exists():
+                    files = [f"-i ../../{i}" for i in patch.files()]
+                    patch_command = f"patch {files}"
+
                 writer.build(
                     f"$build_targets_dir/extract-{name}",
                     f"extract-tar",
                     inputs=[f"${name}_tarball"],
-                    variables={"compression": "x", "extracted_dir": f"${name}_dir"},
+                    variables={
+                        "compression": compression,
+                        "extracted_dir": f"${name}_dir",
+                        "patch_command": patch_command}
                 )
+                writer.newline()
 
-            writer.newline()
             writer.comment("step 2 - build binutils")
             writer.newline()
             writer.variable("binutils_dir", "$build_dir/binutils-build")
@@ -752,7 +772,8 @@ class Args:
             writer.newline()
             writer.comment("clean targets")
             writer.newline()
-            writer.rule("delete-directory", "rm -rf $in", description="Deleting $in")
+            writer.rule("delete-directory", "rm -rf $in",
+                        description="Deleting $in")
             writer.newline()
             writer.rule("clean-all", "true", description="Cleaned everything")
             writer.newline()
@@ -783,7 +804,6 @@ class Args:
                 "install-all",
                 implicit=[
                     "$build_targets_dir/install-binutils",
-                    # "$build_targets_dir/install-libgcc-static",
                     "$build_targets_dir/install-gcc",
                     "$build_targets_dir/install-musl",
                     "$build_targets_dir/install-linux",
@@ -800,6 +820,50 @@ class Args:
             )
 
 
+class Patch:
+    name = str,
+    version = str,
+
+    path = str,
+
+    def __init__(self, name: str, version: str):
+        self.name = name
+        self.version = version
+
+        self.path = f"patches/musl-cross-make-{MUSL_CROSS_MAKE_COMMIT}/patches/{name}-{version}"
+
+    def exists(self) -> bool:
+        return Path(self.path).exists()
+
+    def files(self) -> List[str]:
+        return [f"{self.path}/{i}" for i in os.listdir(self.path)]
+
+
+def main(args: argparse.Namespace) -> None:
+    extracted_dir = f"patches/musl-cross-make-{MUSL_CROSS_MAKE_COMMIT}"
+
+    if not Path(extracted_dir).exists():
+        url = f"https://github.com/richfelker/musl-cross-make/archive/{MUSL_CROSS_MAKE_COMMIT}.zip"
+        print(f"Downloading patches from {url}")
+        response = requests.get(url)
+        data = io.BytesIO(response.content)
+        print(f"Extracting patches at {extracted_dir}")
+        f = zipfile.ZipFile(data)
+        f.extractall("patches")
+    else:
+        print(f"Patches are already downloaded at {extracted_dir}")
+
+    args = Args(args)
+    failed = args.try_get_tools()
+
+    if failed:
+        print("Error: Some tools do not exist. You may need add them to your PATH.")
+        sys.exit(1)
+
+    args.dependencies_summary()
+    args.ninja()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="setup",
@@ -807,24 +871,14 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--build-dir",
-        required=False,
-        type=Path,
-        default=Path(".").joinpath("build").absolute(),
-        help="Directory where to build toolchain.",
-    )
-    parser.add_argument(
         "--prefix",
-        required=False,
-        type=Path,
-        default=Path(".").joinpath("toolchain").absolute(),
+        default="$root_dir/toolchain",
         help="Directory where to install toolchain.",
     )
-
     group = parser.add_argument_group("toolchain options")
     group.add_argument(
         "--host",
-        help="Host for the toolchain. Do not use this flag until you need to build canadian cross toolchain.",
+        help="Host for the toolchain. Do not use this flag until you need to build cross native or canadian cross toolchain.",
     )
     group.add_argument(
         "--target",
@@ -893,51 +947,43 @@ if __name__ == "__main__":
     group = parser.add_argument_group("dependencies")
     group.add_argument(
         "--binutils-version",
-        default="2.40", # https://ftp.gnu.org/gnu/binutils
+        default="2.40",  # https://ftp.gnu.org/gnu/binutils
         help="Binutils version to build.",
     )
     group.add_argument(
         "--gcc-version",
-        default="13.1.0", # https://ftp.gnu.org/gnu/gcc
+        default="13.1.0",  # https://ftp.gnu.org/gnu/gcc
         help="Gcc version to build.",
     )
     group.add_argument(
         "--gmp-version",
-        default="6.2.1", # https://ftp.gnu.org/gnu/gmp
+        default="6.2.1",  # https://ftp.gnu.org/gnu/gmp
         help="Gmp version to build.",
     )
     group.add_argument(
         "--mpc-version",
-        default="1.3.1", # https://ftp.gnu.org/gnu/mpc
+        default="1.3.1",  # https://ftp.gnu.org/gnu/mpc
         help="Mpc version to build.",
     )
     group.add_argument(
         "--mpfr-version",
-        default="4.2.0", # https://ftp.gnu.org/gnu/mpfr
+        default="4.2.0",  # https://ftp.gnu.org/gnu/mpfr
         help="Mpfr version to build.",
     )
     group.add_argument(
         "--isl-version",
-        default="0.24", # https://libisl.sourceforge.io
+        default="0.24",  # https://libisl.sourceforge.io
         # default="0.26",
         help="Isl version to build.",
     )
     group.add_argument(
         "--linux-version",
-        default="6.3.4", # https://www.kernel.org
+        default="6.3.4",  # https://www.kernel.org
         help="Linux version to build.",
     )
     group.add_argument(
         "--musl-version",
-        default="1.2.4", # https://musl.libc.org
+        default="1.2.4",  # https://musl.libc.org
         help="Musl version to build.",
     )
-    args = Args(parser.parse_args())
-    failed = args.try_get_tools()
-
-    if failed:
-        print("Error: Some tools do not exist. You may need add them to your PATH.")
-        sys.exit(1)
-
-    args.dependencies_summary()
-    args.ninja()
+    main(parser.parse_args())
