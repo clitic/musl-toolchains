@@ -15,6 +15,7 @@ MUSL_CROSS_MAKE_COMMIT = "fe915821b652a7fa37b34a596f47d8e20bc72338"
 
 
 class Args:
+    no_patches = (bool,)
     prefix = (str,)
 
     host = (Optional[str],)
@@ -45,6 +46,7 @@ class Args:
     _make = (str,)
 
     def __init__(self, args: argparse.Namespace) -> None:
+        self.no_patches = args.no_patches
         self.prefix = args.prefix
 
         self.host = args.host
@@ -216,6 +218,9 @@ class Args:
         if not self._exists("curl", "Checking for tool curl"):
             failed = True
 
+        if not self._exists("patch", "Checking for tool patch"):
+            failed = True
+
         if not self._exists("tar", "Checking for tool tar"):
             failed = True
 
@@ -321,8 +326,8 @@ class Args:
             writer.newline()
             writer.rule(
                 "extract-tar",
-                "rm -rf $extracted_dir && tar -C $build_dir -x -$compression -f $in && cd $extracted_dir && $patch_command && touch ../$out",
-                description='Extracting $in and patching it with "$patch_command"',
+                "rm -rf $extracted_dir && tar -C $build_dir -x -$compression -f $in && cd $extracted_dir && $patch_command && touch ../../$out",
+                description="Extracting $in",
             )
             writer.newline()
             writer.build(
@@ -413,11 +418,17 @@ class Args:
                 if name in ["mpc", "musl"]:
                     compression = "x"
 
-                patch = Patch(name, version)
+                if not self.no_patches:
+                    patch = Patch(name, version)
 
-                if patch.exists():
-                    files = [f"-i ../../{i}" for i in patch.files()]
-                    patch_command = f"patch {files}"
+                    if patch.exists():
+                        patch_command = "patch -p 1"
+
+                        for patch_file in patch.files():
+                            patch_command += f" -i ../../{patch_file}"
+
+                        if patch_command == "patch -p 1":
+                            patch_command = "true"
 
                 writer.build(
                     f"$build_targets_dir/extract-{name}",
@@ -426,7 +437,8 @@ class Args:
                     variables={
                         "compression": compression,
                         "extracted_dir": f"${name}_dir",
-                        "patch_command": patch_command}
+                        "patch_command": patch_command,
+                    },
                 )
                 writer.newline()
 
@@ -840,20 +852,22 @@ class Patch:
 
 
 def main(args: argparse.Namespace) -> None:
-    extracted_dir = f"patches/musl-cross-make-{MUSL_CROSS_MAKE_COMMIT}"
-
-    if not Path(extracted_dir).exists():
-        url = f"https://github.com/richfelker/musl-cross-make/archive/{MUSL_CROSS_MAKE_COMMIT}.zip"
-        print(f"Downloading patches from {url}")
-        response = requests.get(url)
-        data = io.BytesIO(response.content)
-        print(f"Extracting patches at {extracted_dir}")
-        f = zipfile.ZipFile(data)
-        f.extractall("patches")
-    else:
-        print(f"Patches are already downloaded at {extracted_dir}")
-
     args = Args(args)
+
+    if not args.no_patches:
+        extracted_dir = f"patches/musl-cross-make-{MUSL_CROSS_MAKE_COMMIT}"
+
+        if not Path(extracted_dir).exists():
+            url = f"https://github.com/richfelker/musl-cross-make/archive/{MUSL_CROSS_MAKE_COMMIT}.zip"
+            print(f"Downloading patches from {url}")
+            response = requests.get(url)
+            data = io.BytesIO(response.content)
+            print(f"Extracting patches at {extracted_dir}")
+            f = zipfile.ZipFile(data)
+            f.extractall("patches")
+        else:
+            print(f"Patches are already downloaded at {extracted_dir}")
+
     failed = args.try_get_tools()
 
     if failed:
@@ -869,6 +883,12 @@ if __name__ == "__main__":
         prog="setup",
         description="Configure musl cross toolchain.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--no-patches",
+        action="store_true",
+        default=False,
+        help="Do not apply patches from richfelker/musl-cross-make.",
     )
     parser.add_argument(
         "--prefix",
