@@ -777,8 +777,6 @@ class Args:
                 arch = "riscv"
             elif arch.startswith("s390"):
                 arch = "s390"
-            elif arch.startswith("s390"):
-                arch = "s390"
             elif arch.startswith("sh"):
                 arch = "sh"
             elif arch.startswith("x86_64"):
