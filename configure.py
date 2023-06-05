@@ -754,7 +754,14 @@ class Args:
             writer.newline()
             writer.comment("step 11 - install linux (headers)")
             writer.newline()
-            writer.variable("arch", self.target.split("-")[0])
+            arch = self.target.split("-")[0]
+            
+            if arch.startswith("i") and arch.endswith("86"):
+            	arch = "x86"
+            elif arch == "aarch64":
+            	arch = "arm64"
+            
+            writer.variable("arch", arch)
             writer.newline()
             writer.rule(
                 "build-linux",
@@ -865,6 +872,7 @@ def main(args: argparse.Namespace) -> None:
             print(f"Extracting patches at {extracted_dir}")
             f = zipfile.ZipFile(data)
             f.extractall("patches")
+            f.close()
         else:
             print(f"Patches are already downloaded at {extracted_dir}")
 
@@ -998,7 +1006,7 @@ if __name__ == "__main__":
     )
     group.add_argument(
         "--linux-version",
-        default="6.3.4",  # https://www.kernel.org
+        default="6.3.5",  # https://www.kernel.org
         help="Linux version to build.",
     )
     group.add_argument(
