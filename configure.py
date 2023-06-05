@@ -460,7 +460,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "install-binutils",
-                "cd $binutils_dir && $env_vars $make_command install DESTDIR=$install_dir && touch ../../$outt",
+                "cd $binutils_dir && $env_vars $make_command install DESTDIR=$install_dir && touch ../../$out",
                 description="Installing binutils $binutils_version",
             )
             writer.newline()
