@@ -754,13 +754,36 @@ class Args:
             writer.newline()
             writer.comment("step 11 - install linux (headers)")
             writer.newline()
+            
+            # https://git.musl-libc.org/cgit/musl/tree/INSTALL
+            # https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch
             arch = self.target.split("-")[0]
             
-            if arch.startswith("i") and arch.endswith("86"):
-            	arch = "x86"
-            elif arch == "aarch64":
+            if arch.startswith("aarch64"):
             	arch = "arm64"
-            
+            elif arch.startswith("arm"):
+                arch = "arm"
+            elif arch.startswith("i") and arch.endswith("86"):
+            	arch = "x86"
+            elif arch.startswith("microblaze"):
+                arch = "microblaze"
+            elif arch.startswith("mips"):
+                arch = "mips"
+            elif arch.startswith("or1k"):
+                arch = "openrisc"
+            elif arch.startswith("powerpc"):
+                arch = "powerpc"
+            elif arch.startswith("riscv"):
+                arch = "riscv"
+            elif arch.startswith("s390"):
+                arch = "s390"
+            elif arch.startswith("s390"):
+                arch = "s390"
+            elif arch.startswith("sh"):
+                arch = "sh"
+            elif arch.startswith("x86_64"):
+                arch = "x86_64"
+
             writer.variable("arch", arch)
             writer.newline()
             writer.rule(
