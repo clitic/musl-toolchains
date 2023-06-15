@@ -643,14 +643,14 @@ class Args:
             writer.comment("step 7 - build gcc (all-target-libgcc)")
             writer.newline()
             writer.rule(
-                "build-gcc-libgcc",
+                "build-gcc-all-target-libgcc",
                 'cd $gcc_dir && $env_vars $make_command all-target-libgcc MAKE="$make_command enable_shared=no" && touch ../../$out',
                 description="Building gcc $gcc_version (all-target-libgcc)",
             )
             writer.newline()
             writer.build(
-                "$build_targets_dir/build-gcc-libgcc",
-                "build-gcc-libgcc",
+                "$build_targets_dir/build-gcc-all-target-libgcc",
+                "build-gcc-all-target-libgcc",
                 implicit=["$build_targets_dir/install-musl-headers-dep"],
                 pool="console",
             )
@@ -678,7 +678,7 @@ class Args:
             writer.build(
                 "$build_targets_dir/build-musl",
                 "build-musl",
-                implicit=["$build_targets_dir/build-gcc-libgcc"],
+                implicit=["$build_targets_dir/build-gcc-all-target-libgcc"],
                 pool="console",
             )
             writer.newline()
