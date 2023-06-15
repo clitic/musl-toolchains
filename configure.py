@@ -650,7 +650,7 @@ class Args:
             writer.newline()
             writer.build(
                 "$build_targets_dir/build-gcc-libgcc",
-                "build-gcc-libgcc-static",
+                "build-gcc-libgcc",
                 implicit=["$build_targets_dir/install-musl-headers-dep"],
                 pool="console",
             )
