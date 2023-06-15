@@ -269,9 +269,10 @@ class Args:
             writer.variable("musl_site", "https://www.musl-libc.org")
             writer.newline()
             writer.variable("download_command", f"curl -L -o")
+            make_command = f"{self._make} -j {cpu_count} MULTILIB_OSDIRNAMES= INFO_DEPS= infodir= ac_cv_prog_lex_root=lex.yy MAKEINFO=false"
             writer.variable(
                 "make_command",
-                f"{self._make} -j {cpu_count} MULTILIB_OSDIRNAMES= INFO_DEPS= infodir= ac_cv_prog_lex_root=lex.yy",
+                f"{make_command} MAKE={make_command}",
             )
             writer.newline()
             writer.comment("edit below this line carefully")
