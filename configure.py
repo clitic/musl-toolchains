@@ -269,10 +269,9 @@ class Args:
             writer.variable("musl_site", "https://www.musl-libc.org")
             writer.newline()
             writer.variable("download_command", f"curl -L -o")
-            make_command = f"{self._make} -j {cpu_count} MULTILIB_OSDIRNAMES= INFO_DEPS= infodir= ac_cv_prog_lex_root=lex.yy MAKEINFO=false"
             writer.variable(
                 "make_command",
-                f"{make_command} MAKE={make_command}",
+                f"{self._make} -j {cpu_count} MULTILIB_OSDIRNAMES= INFO_DEPS= infodir= ac_cv_prog_lex_root=lex.yy MAKEINFO=false",
             )
             writer.newline()
             writer.comment("edit below this line carefully")
@@ -456,13 +455,13 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-binutils",
-                "cd $binutils_dir && $env_vars $make_command all && touch ../../$out",
+                'cd $binutils_dir && $env_vars $make_command all MAKE="$make_command" && touch ../../$out',
                 description="Building binutils $binutils_version",
             )
             writer.newline()
             writer.rule(
                 "install-binutils",
-                "cd $binutils_dir && $env_vars $make_command install DESTDIR=$install_dir && touch ../../$out",
+                'cd $binutils_dir && $env_vars $make_command install MAKE="$make_command" DESTDIR=$install_dir && touch ../../$out',
                 description="Installing binutils $binutils_version",
             )
             writer.newline()
@@ -559,7 +558,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-gcc-all-gcc",
-                "cd $gcc_dir && $env_vars $make_command all-gcc && touch ../../$out",
+                'cd $gcc_dir && $env_vars $make_command all-gcc MAKE="$make_command" && touch ../../$out',
                 description="Building gcc $gcc_version (all-gcc)",
             )
             writer.newline()
@@ -641,16 +640,16 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 7 - build gcc (libgcc.a)")
+            writer.comment("step 7 - build gcc (all-target-libgcc)")
             writer.newline()
             writer.rule(
-                "build-gcc-libgcc-static",
-                "cd $gcc_dir && $env_vars $make_command enable_shared=no all-target-libgcc && touch ../../$out",
-                description="Building gcc $gcc_version (libgcc.a)",
+                "build-gcc-libgcc",
+                'cd $gcc_dir && $env_vars $make_command all-target-libgcc MAKE="$make_command enable_shared=no" && touch ../../$out',
+                description="Building gcc $gcc_version (all-target-libgcc)",
             )
             writer.newline()
             writer.build(
-                "$build_targets_dir/build-gcc-libgcc-static",
+                "$build_targets_dir/build-gcc-libgcc",
                 "build-gcc-libgcc-static",
                 implicit=["$build_targets_dir/install-musl-headers-dep"],
                 pool="console",
@@ -679,7 +678,7 @@ class Args:
             writer.build(
                 "$build_targets_dir/build-musl",
                 "build-musl",
-                implicit=["$build_targets_dir/build-gcc-libgcc-static"],
+                implicit=["$build_targets_dir/build-gcc-libgcc"],
                 pool="console",
             )
             writer.newline()
@@ -697,45 +696,17 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 9 - build gcc (libgcc.so)")
-            writer.newline()
-            writer.rule(
-                "clean-gcc-libgcc-static",
-                "cd $gcc_dir && $env_vars $make_command -C $target/libgcc distclean && touch ../../$out",
-                description="Cleaning gcc $gcc_version (libgcc.a)",
-            )
-            writer.newline()
-            writer.rule(
-                "build-gcc-libgcc-shared",
-                "cd $gcc_dir && $env_vars $make_command enable_shared=yes all-target-libgcc && touch ../../$out",
-                description="Building gcc $gcc_version (libgcc.so)",
-            )
-            writer.newline()
-            writer.build(
-                "$build_targets_dir/clean-gcc-libgcc-static",
-                "clean-gcc-libgcc-static",
-                implicit=["$build_targets_dir/install-musl-dep"],
-                pool="console",
-            )
-            writer.newline()
-            writer.build(
-                "$build_targets_dir/build-gcc-libgcc-shared",
-                "build-gcc-libgcc-shared",
-                implicit=["$build_targets_dir/clean-gcc-libgcc-static"],
-                pool="console",
-            )
-            writer.newline()
-            writer.comment("step 10 - build gcc")
+            writer.comment("step 9 - build gcc")
             writer.newline()
             writer.rule(
                 "build-gcc",
-                "cd $gcc_dir && $env_vars $make_command && touch ../../$out",
+                'cd $gcc_dir && $env_vars $make_command MAKE="$make_command" && touch ../../$out',
                 description="Building gcc $gcc_version",
             )
             writer.newline()
             writer.rule(
                 "install-gcc",
-                "cd $gcc_dir && $env_vars $make_command install DESTDIR=$install_dir && touch ../../$out",
+                'cd $gcc_dir && $env_vars $make_command install MAKE="$make_command" DESTDIR=$install_dir && touch ../../$out',
                 # ln -sf $(TARGET)-gcc $(DESTDIR)$(OUTPUT)/bin/$(TARGET)-cc
                 description="Installing gcc $gcc_version",
             )
@@ -743,7 +714,7 @@ class Args:
             writer.build(
                 "$build_targets_dir/build-gcc",
                 "build-gcc",
-                implicit=["$build_targets_dir/build-gcc-libgcc-shared"],
+                implicit=["$build_targets_dir/install-musl-dep"],
                 pool="console",
             )
             writer.newline()
@@ -754,7 +725,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 11 - install linux (headers)")
+            writer.comment("step 10 - install linux (headers)")
             writer.newline()
             
             # https://git.musl-libc.org/cgit/musl/tree/INSTALL
