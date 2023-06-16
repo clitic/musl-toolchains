@@ -491,7 +491,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-sysroot-dir-dep",
-                f'rm -rf $build_sysroot_dir && mkdir -p $build_sysroot_dir/usr/include $build_sysroot_dir/usr/lib && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib32 && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib64 && touch ../../$out',
+                f'rm -rf $build_sysroot_dir && mkdir -p $build_sysroot_dir/usr/include $build_sysroot_dir/usr/lib && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib32 && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib64 && touch $out',
                 description="Creating build sysroot dir at $build_sysroot_dir",
             )
             writer.newline()
