@@ -1,3 +1,5 @@
 build
 downloads
+patches
+toolchain
 build.ninja
