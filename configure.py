@@ -456,13 +456,13 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-binutils",
-                'cd $binutils_dir && $env_vars $make_command all MAKE="$make_command" && touch ../../$out',
+                'cd $binutils_dir && $env_vars $make_command MAKE="$make_command" all && touch ../../$out',
                 description="Building binutils $binutils_version",
             )
             writer.newline()
             writer.rule(
                 "install-binutils",
-                'cd $binutils_dir && $env_vars $make_command install MAKE="$make_command" DESTDIR=$install_dir && touch ../../$out',
+                'cd $binutils_dir && $env_vars $make_command MAKE="$make_command" DESTDIR=$install_dir install && touch ../../$out',
                 description="Installing binutils $binutils_version",
             )
             writer.newline()
@@ -574,7 +574,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-gcc-all-gcc",
-                'cd $gcc_dir && $env_vars $make_command all-gcc MAKE="$make_command" && touch ../../$out',
+                'cd $gcc_dir && $env_vars $make_command MAKE="$make_command" all-gcc && touch ../../$out',
                 description="Building gcc $gcc_version (all-gcc)",
             )
             writer.newline()
@@ -645,7 +645,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "install-musl-headers-dep",
-                f"cd $musl_dir && $env_vars $make_command install-headers prefix=/usr DESTDIR=$build_sysroot_dir && touch ../../$out",
+                f"cd $musl_dir && $env_vars $make_command DESTDIR=$build_sysroot_dir prefix=/usr install-headers && touch ../../$out",
                 description="Configuring musl $musl_version",
             )
             writer.newline()
@@ -660,7 +660,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-gcc-all-target-libgcc",
-                'cd $gcc_dir && $env_vars $make_command all-target-libgcc MAKE="$make_command enable_shared=no" && touch ../../$out',
+                'cd $gcc_dir && $env_vars $make_command MAKE="$make_command enable_shared=no" all-target-libgcc && touch ../../$out',
                 description="Building gcc $gcc_version (all-target-libgcc)",
             )
             writer.newline()
@@ -681,13 +681,13 @@ class Args:
             writer.newline()
             writer.rule(
                 "install-musl-dep",
-                "cd $musl_dir && $env_vars $make_command install prefix=/usr DESTDIR=$build_sysroot_dir && touch ../../$out",
+                "cd $musl_dir && $env_vars $make_command DESTDIR=$build_sysroot_dir prefix=/usr install && touch ../../$out",
                 description="Installing musl $musl_version at $build_sysroot_dir",
             )
             writer.newline()
             writer.rule(
                 "install-musl",
-                "cd $musl_dir && $env_vars $make_command install DESTDIR=$install_dir/$target && touch ../../$out",
+                "cd $musl_dir && $env_vars $make_command DESTDIR=$install_dir/$target install && touch ../../$out",
                 description="Installing musl $musl_version",
             )
             writer.newline()
@@ -722,8 +722,7 @@ class Args:
             writer.newline()
             writer.rule(
                 "install-gcc",
-                'cd $gcc_dir && $env_vars $make_command install MAKE="$make_command" DESTDIR=$install_dir && touch ../../$out',
-                # ln -sf $(TARGET)-gcc $(DESTDIR)$(OUTPUT)/bin/$(TARGET)-cc
+                'cd $gcc_dir && $env_vars $make_command MAKE="$make_command" DESTDIR=$install_dir install && touch ../../$out',
                 description="Installing gcc $gcc_version",
             )
             writer.newline()
@@ -775,13 +774,13 @@ class Args:
             writer.newline()
             writer.rule(
                 "build-linux",
-                "cd $linux_dir && $env_vars $make_command mrproper ARCH=$arch && touch ../../$out",
+                "cd $linux_dir && $env_vars $make_command ARCH=$arch mrproper && touch ../../$out",
                 description="Building linux $linux_version",
             )
             writer.newline()
             writer.rule(
                 "install-linux",
-                "rm -rf $build_dir/linux-build && mkdir $build_dir/linux-build && cd $linux_dir && $env_vars $make_command headers_install O=$root_dir/$build_dir/linux-build ARCH=$arch INSTALL_HDR_PATH=$install_dir/$target && touch ../../$out",
+                "rm -rf $build_dir/linux-build && mkdir $build_dir/linux-build && cd $linux_dir && $env_vars $make_command O=$root_dir/$build_dir/linux-build ARCH=$arch INSTALL_HDR_PATH=$install_dir/$target headers_install && touch ../../$out",
                 description="Installing linux $linux_version",
             )
             writer.newline()
