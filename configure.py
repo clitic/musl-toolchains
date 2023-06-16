@@ -155,7 +155,8 @@ class Args:
 
         print(f"     linux {self.linux_version}")
         print(f"       mpc {self.mpc_version}")
-        print(f"      mpfr {self.mpfr_version}\n")
+        print(f"      mpfr {self.mpfr_version}")
+        print(f"      musl {self.musl_version}\n")
 
     @staticmethod
     def _exists(cmd: str, msg: str) -> bool:
@@ -486,7 +487,20 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 3 - configure gcc")
+            writer.comment("step 3 - create build sysroot dir")
+            writer.newline()
+            writer.rule(
+                "build-sysroot-dir-dep",
+                f'rm -rf $build_sysroot_dir && mkdir -p $build_sysroot_dir/usr/include $build_sysroot_dir/usr/lib && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib32 && ln -sf $build_sysroot_dir/usr/lib $build_sysroot_dir/usr/lib64 && touch ../../$out',
+                description="Creating build sysroot dir at $build_sysroot_dir",
+            )
+            writer.newline()
+            writer.build(
+                "$build_targets_dir/build-sysroot-dir-dep",
+                "build-sysroot-dir-dep",
+            )
+            writer.newline()
+            writer.comment("step 4 - configure gcc")
             writer.newline()
             writer.rule(
                 "move-directory",
@@ -538,15 +552,17 @@ class Args:
 
             writer.rule(
                 "configure-gcc",
-                f'rm -rf $build_sysroot_dir && mkdir -p $build_sysroot_dir/usr/include && rm -rf $gcc_dir && mkdir $gcc_dir && cd $gcc_dir && $env_vars ../gcc-$gcc_version/configure {" ".join(self.gcc_flags)} {" ".join(gcc_vars)} && touch ../../$out',
+                f'rm -rf $gcc_dir && mkdir $gcc_dir && cd $gcc_dir && $env_vars ../gcc-$gcc_version/configure {" ".join(self.gcc_flags)} {" ".join(gcc_vars)} && touch ../../$out',
                 description="Configuring gcc $gcc_version",
             )
             writer.newline()
 
             implicit = ["$build_targets_dir/extract-gcc"]
             implicit.extend(build_targets_move)
-            implicit.append("$build_targets_dir/build-binutils")
-
+            implicit.extend([
+                "$build_targets_dir/build-binutils",
+                "$build_targets_dir/build-sysroot-dir-dep",
+            ])
             writer.build(
                 "$build_targets_dir/configure-gcc",
                 "configure-gcc",
@@ -554,7 +570,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 4 - build gcc (all-gcc)")
+            writer.comment("step 5 - build gcc (all-gcc)")
             writer.newline()
             writer.rule(
                 "build-gcc-all-gcc",
@@ -569,7 +585,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 5 - configure musl")
+            writer.comment("step 6 - configure musl")
             writer.newline()
             writer.variable("musl_dir", "$build_dir/musl-build")
 
@@ -625,7 +641,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 6 - install musl (headers)")
+            writer.comment("step 7 - install musl (headers)")
             writer.newline()
             writer.rule(
                 "install-musl-headers-dep",
@@ -640,7 +656,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 7 - build gcc (all-target-libgcc)")
+            writer.comment("step 8 - build gcc (all-target-libgcc)")
             writer.newline()
             writer.rule(
                 "build-gcc-all-target-libgcc",
@@ -655,7 +671,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 8 - build musl")
+            writer.comment("step 9 - build musl")
             writer.newline()
             writer.rule(
                 "build-musl",
@@ -696,7 +712,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 9 - build gcc")
+            writer.comment("step 10 - build gcc")
             writer.newline()
             writer.rule(
                 "build-gcc",
@@ -725,7 +741,7 @@ class Args:
                 pool="console",
             )
             writer.newline()
-            writer.comment("step 10 - install linux (headers)")
+            writer.comment("step 11 - install linux (headers)")
             writer.newline()
             
             # https://git.musl-libc.org/cgit/musl/tree/INSTALL
@@ -1000,7 +1016,7 @@ if __name__ == "__main__":
     )
     group.add_argument(
         "--linux-version",
-        default="6.3.6",  # https://www.kernel.org
+        default="6.1.34",  # https://www.kernel.org
         help="Linux version to build.",
     )
     group.add_argument(
